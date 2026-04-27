@@ -23,7 +23,8 @@ public sealed class ExecutionRunnerForm : Form
     private readonly Label accessLabel = new();
     private readonly Label statusLabel = new();
     private readonly ComboBox sectionFilter = new();
-    private readonly CheckBox showCompletedCheckBox = new() { Text = "Show completed", AutoSize = true };
+    private readonly ComboBox assetFilter = new();
+    private readonly ComboBox statusFilter = new();
     private readonly CheckBox showNotApplicableCheckBox = new() { Text = "Show not applicable", AutoSize = true };
     private readonly ListView workList = new();
     private readonly FlowLayoutPanel cardsPanel = new();
@@ -136,15 +137,18 @@ public sealed class ExecutionRunnerForm : Form
         var toolbar = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
-            ColumnCount = 7,
+            ColumnCount = 10,
             RowCount = 1,
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Margin = new Padding(0, 0, 0, 12)
         };
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 300));
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 260));
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 280));
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 190));
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         toolbar.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
@@ -159,9 +163,38 @@ public sealed class ExecutionRunnerForm : Form
             Margin = new Padding(0, 0, 10, 0)
         };
 
+        var assetLabel = new Label
+        {
+            Text = "Asset",
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold),
+            Margin = new Padding(14, 0, 10, 0)
+        };
+
+        var statusFilterLabel = new Label
+        {
+            Text = "Status",
+            AutoSize = true,
+            Anchor = AnchorStyles.Left,
+            Font = new Font(SystemFonts.DefaultFont, FontStyle.Bold),
+            Margin = new Padding(14, 0, 10, 0)
+        };
+
         sectionFilter.DropDownStyle = ComboBoxStyle.DropDownList;
         sectionFilter.Dock = DockStyle.Fill;
         sectionFilter.SelectedIndexChanged += (_, _) =>
+        {
+            if (!populatingFilters)
+            {
+                PopulateAssetFilter();
+                RenderWork();
+            }
+        };
+
+        assetFilter.DropDownStyle = ComboBoxStyle.DropDownList;
+        assetFilter.Dock = DockStyle.Fill;
+        assetFilter.SelectedIndexChanged += (_, _) =>
         {
             if (!populatingFilters)
             {
@@ -169,8 +202,15 @@ public sealed class ExecutionRunnerForm : Form
             }
         };
 
-        showCompletedCheckBox.Margin = new Padding(14, 0, 0, 0);
-        showCompletedCheckBox.CheckedChanged += (_, _) => RenderWork();
+        statusFilter.DropDownStyle = ComboBoxStyle.DropDownList;
+        statusFilter.Dock = DockStyle.Fill;
+        statusFilter.SelectedIndexChanged += (_, _) =>
+        {
+            if (!populatingFilters)
+            {
+                RenderWork();
+            }
+        };
 
         showNotApplicableCheckBox.Margin = new Padding(14, 0, 0, 0);
         showNotApplicableCheckBox.CheckedChanged += (_, _) => RenderWork();
@@ -183,11 +223,14 @@ public sealed class ExecutionRunnerForm : Form
 
         toolbar.Controls.Add(filterLabel, 0, 0);
         toolbar.Controls.Add(sectionFilter, 1, 0);
-        toolbar.Controls.Add(showCompletedCheckBox, 2, 0);
-        toolbar.Controls.Add(showNotApplicableCheckBox, 3, 0);
-        toolbar.Controls.Add(new Label(), 4, 0);
-        toolbar.Controls.Add(switchUserButton, 5, 0);
-        toolbar.Controls.Add(refreshButton, 6, 0);
+        toolbar.Controls.Add(assetLabel, 2, 0);
+        toolbar.Controls.Add(assetFilter, 3, 0);
+        toolbar.Controls.Add(statusFilterLabel, 4, 0);
+        toolbar.Controls.Add(statusFilter, 5, 0);
+        toolbar.Controls.Add(showNotApplicableCheckBox, 6, 0);
+        toolbar.Controls.Add(new Label(), 7, 0);
+        toolbar.Controls.Add(switchUserButton, 8, 0);
+        toolbar.Controls.Add(refreshButton, 9, 0);
 
         return CreateSurface(toolbar, new Padding(12), elevated: true);
     }
@@ -239,7 +282,7 @@ public sealed class ExecutionRunnerForm : Form
 
         var hint = new Label
         {
-            Text = "Pick a check, work the card, move on.",
+            Text = "Filter by section, asset, or status. Pick a check, work the card, move on.",
             AutoSize = true,
             ForeColor = AppTheme.Current.TextSecondary,
             Margin = new Padding(0, 0, 0, 12)
@@ -251,9 +294,10 @@ public sealed class ExecutionRunnerForm : Form
         workList.FullRowSelect = true;
         workList.HideSelection = false;
         workList.MultiSelect = false;
-        workList.Columns.Add("Ref", 90);
-        workList.Columns.Add("Section", 135);
-        workList.Columns.Add("State", 105);
+        workList.Columns.Add("Ref", 75);
+        workList.Columns.Add("Section", 115);
+        workList.Columns.Add("Asset", 140);
+        workList.Columns.Add("State", 85);
         workList.SelectedIndexChanged += (_, _) =>
         {
             if (workList.SelectedItems.Count == 0 || workList.SelectedItems[0].Tag is not RunnerWorkItem item)
@@ -300,9 +344,10 @@ public sealed class ExecutionRunnerForm : Form
             project = repository.Load(ProjectLocation.FromProjectFolder(projectFolderPath));
             EnsureActiveUserSelected();
             PopulateSectionFilter();
+            PopulateAssetFilter();
+            PopulateStatusFilter();
             RenderHeader();
             RenderWork();
-            statusLabel.Text = "Runner loaded.";
         }
         catch (Exception ex)
         {
@@ -379,6 +424,82 @@ public sealed class ExecutionRunnerForm : Form
         populatingFilters = false;
     }
 
+    private void PopulateAssetFilter()
+    {
+        if (project is null)
+        {
+            return;
+        }
+
+        var selectedAssetId = (assetFilter.SelectedItem as AssetFilterItem)?.AssetId;
+        var wasPopulating = populatingFilters;
+        populatingFilters = true;
+        assetFilter.Items.Clear();
+        assetFilter.Items.Add(new AssetFilterItem(null, "All assets"));
+
+        var sectionId = (sectionFilter.SelectedItem as SectionFilterItem)?.SectionId;
+        var assetIds = new HashSet<Guid>();
+        foreach (var section in project.Sections.OrderBy(section => section.DisplayOrder))
+        {
+            if (sectionId is not null && section.SectionId != sectionId.Value)
+            {
+                continue;
+            }
+
+            foreach (var testItem in section.TestItems)
+            {
+                if (!CanSeeWork(section, testItem) || testItem.AssetId is null)
+                {
+                    continue;
+                }
+
+                assetIds.Add(testItem.AssetId.Value);
+                var asset = FindAsset(testItem.AssetId.Value);
+                if (asset?.ParentAssetId is not null)
+                {
+                    assetIds.Add(asset.ParentAssetId.Value);
+                }
+            }
+        }
+
+        foreach (var assetId in assetIds
+            .Select(assetId => new AssetFilterItem(assetId, AssetHierarchyLabel(assetId)))
+            .OrderBy(item => item.ToString(), StringComparer.OrdinalIgnoreCase))
+        {
+            assetFilter.Items.Add(assetId);
+        }
+
+        var target = assetFilter.Items
+            .OfType<AssetFilterItem>()
+            .FirstOrDefault(item => item.AssetId == selectedAssetId)
+            ?? assetFilter.Items.OfType<AssetFilterItem>().FirstOrDefault();
+        assetFilter.SelectedItem = target;
+        populatingFilters = wasPopulating;
+    }
+
+    private void PopulateStatusFilter()
+    {
+        var selectedStatus = (statusFilter.SelectedItem as StatusFilterItem)?.Status ?? WorkStatusFilter.Outstanding;
+        var wasPopulating = populatingFilters;
+        populatingFilters = true;
+        statusFilter.Items.Clear();
+        statusFilter.Items.Add(new StatusFilterItem(WorkStatusFilter.Outstanding, "Outstanding"));
+        statusFilter.Items.Add(new StatusFilterItem(WorkStatusFilter.All, "All visible work"));
+        statusFilter.Items.Add(new StatusFilterItem(WorkStatusFilter.NotTested, "Not tested"));
+        statusFilter.Items.Add(new StatusFilterItem(WorkStatusFilter.Passed, "Passed"));
+        statusFilter.Items.Add(new StatusFilterItem(WorkStatusFilter.Failed, "Failed"));
+        statusFilter.Items.Add(new StatusFilterItem(WorkStatusFilter.NeedsEvidence, "Needs evidence"));
+        statusFilter.Items.Add(new StatusFilterItem(WorkStatusFilter.RequiresWitness, "Requires witness"));
+        statusFilter.Items.Add(new StatusFilterItem(WorkStatusFilter.NotApplicable, "Not applicable"));
+
+        var target = statusFilter.Items
+            .OfType<StatusFilterItem>()
+            .FirstOrDefault(item => item.Status == selectedStatus)
+            ?? statusFilter.Items.OfType<StatusFilterItem>().FirstOrDefault();
+        statusFilter.SelectedItem = target;
+        populatingFilters = wasPopulating;
+    }
+
     private bool SectionHasVisibleWork(Section section)
     {
         if (project is null)
@@ -437,7 +558,10 @@ public sealed class ExecutionRunnerForm : Form
             statusLabel.Text = project.State == ProjectState.Executable
                 ? "No work items match this operator/filter."
                 : "This project is not open for FAT execution yet.";
+            return;
         }
+
+        statusLabel.Text = $"Showing {items.Count} check(s) for {FilterSummary()}.";
     }
 
     private IEnumerable<RunnerWorkItem> FilteredWorkItems()
@@ -448,6 +572,8 @@ public sealed class ExecutionRunnerForm : Form
         }
 
         var sectionId = (sectionFilter.SelectedItem as SectionFilterItem)?.SectionId;
+        var assetId = (assetFilter.SelectedItem as AssetFilterItem)?.AssetId;
+        var status = (statusFilter.SelectedItem as StatusFilterItem)?.Status ?? WorkStatusFilter.Outstanding;
         foreach (var section in project.Sections.OrderBy(section => section.DisplayOrder))
         {
             if (sectionId is not null && section.SectionId != sectionId.Value)
@@ -463,12 +589,19 @@ public sealed class ExecutionRunnerForm : Form
                 }
 
                 var effectiveApplicability = project.EffectiveTestApplicability(section, testItem);
-                if (effectiveApplicability == ApplicabilityState.NotApplicable && !showNotApplicableCheckBox.Checked)
+                if (effectiveApplicability == ApplicabilityState.NotApplicable &&
+                    !showNotApplicableCheckBox.Checked &&
+                    status != WorkStatusFilter.NotApplicable)
                 {
                     continue;
                 }
 
-                if (!showCompletedCheckBox.Checked && testItem.LatestResult is TestResult.Pass)
+                if (assetId is not null && !TestBelongsToAssetScope(testItem, assetId.Value))
+                {
+                    continue;
+                }
+
+                if (!MatchesStatusFilter(testItem, effectiveApplicability, status))
                 {
                     continue;
                 }
@@ -476,6 +609,55 @@ public sealed class ExecutionRunnerForm : Form
                 yield return new RunnerWorkItem(section, testItem, effectiveApplicability);
             }
         }
+    }
+
+    private bool TestBelongsToAssetScope(TestItem testItem, Guid assetId)
+    {
+        if (project is null || testItem.AssetId is null)
+        {
+            return false;
+        }
+
+        return project.AssetScope(assetId).Contains(testItem.AssetId.Value);
+    }
+
+    private bool MatchesStatusFilter(
+        TestItem testItem,
+        ApplicabilityState effectiveApplicability,
+        WorkStatusFilter status)
+    {
+        var isNotApplicable = effectiveApplicability == ApplicabilityState.NotApplicable;
+        return status switch
+        {
+            WorkStatusFilter.All => true,
+            WorkStatusFilter.Outstanding => !isNotApplicable &&
+                (testItem.LatestResult == TestResult.NotTested ||
+                 testItem.LatestFailureBlocksProgression() ||
+                 MissingEvidenceCount(testItem) > 0),
+            WorkStatusFilter.NotTested => !isNotApplicable && testItem.LatestResult == TestResult.NotTested,
+            WorkStatusFilter.Passed => !isNotApplicable &&
+                testItem.LatestResult == TestResult.Pass &&
+                MissingEvidenceCount(testItem) == 0,
+            WorkStatusFilter.Failed => !isNotApplicable && testItem.LatestResult == TestResult.Fail,
+            WorkStatusFilter.NeedsEvidence => !isNotApplicable && MissingEvidenceCount(testItem) > 0,
+            WorkStatusFilter.RequiresWitness => !isNotApplicable && testItem.BehaviourRules.RequiresWitness,
+            WorkStatusFilter.NotApplicable => isNotApplicable,
+            _ => true
+        };
+    }
+
+    private int MissingEvidenceCount(TestItem testItem)
+    {
+        return project?.MissingEvidenceTypes(testItem).Count ?? 0;
+    }
+
+    private string FilterSummary()
+    {
+        var actor = activeUser?.DisplayName ?? "operator";
+        var section = (sectionFilter.SelectedItem as SectionFilterItem)?.ToString() ?? "all assigned work";
+        var asset = (assetFilter.SelectedItem as AssetFilterItem)?.ToString() ?? "all assets";
+        var status = (statusFilter.SelectedItem as StatusFilterItem)?.ToString() ?? "outstanding";
+        return $"{actor} | {section} | {asset} | {status}";
     }
 
     private void RenderQueue(IReadOnlyList<RunnerWorkItem> items)
@@ -488,6 +670,7 @@ public sealed class ExecutionRunnerForm : Form
             {
                 var row = new ListViewItem(item.TestItem.TestReference);
                 row.SubItems.Add(item.Section.Title);
+                row.SubItems.Add(AssetHierarchyLabel(item.TestItem.AssetId));
                 row.SubItems.Add(StateText(item));
                 row.Tag = item;
                 workList.Items.Add(row);
@@ -1697,6 +1880,18 @@ public sealed class ExecutionRunnerForm : Form
 
     private sealed record InputControlTag(Guid TestInputId, bool Required);
 
+    private enum WorkStatusFilter
+    {
+        Outstanding,
+        All,
+        NotTested,
+        Passed,
+        Failed,
+        NeedsEvidence,
+        RequiresWitness,
+        NotApplicable
+    }
+
     private sealed class SectionFilterItem
     {
         public SectionFilterItem(Guid? sectionId, string text)
@@ -1706,6 +1901,40 @@ public sealed class ExecutionRunnerForm : Form
         }
 
         public Guid? SectionId { get; }
+        private string Text { get; }
+
+        public override string ToString()
+        {
+            return Text;
+        }
+    }
+
+    private sealed class AssetFilterItem
+    {
+        public AssetFilterItem(Guid? assetId, string text)
+        {
+            AssetId = assetId;
+            Text = text;
+        }
+
+        public Guid? AssetId { get; }
+        private string Text { get; }
+
+        public override string ToString()
+        {
+            return Text;
+        }
+    }
+
+    private sealed class StatusFilterItem
+    {
+        public StatusFilterItem(WorkStatusFilter status, string text)
+        {
+            Status = status;
+            Text = text;
+        }
+
+        public WorkStatusFilter Status { get; }
         private string Text { get; }
 
         public override string ToString()
