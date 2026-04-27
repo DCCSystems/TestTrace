@@ -337,6 +337,20 @@ public sealed class ExportService
                 builder.AppendLine($"  - Authority: {FormatAuthority(result.Authority)}");
             }
 
+            if (!string.IsNullOrWhiteSpace(result.WitnessedBy))
+            {
+                builder.AppendLine($"  - Witnessed by: {result.WitnessedBy} at {result.WitnessedAt?.LocalDateTime:g}");
+                if (result.WitnessAuthority is not null)
+                {
+                    builder.AppendLine($"  - Witness authority: {FormatAuthority(result.WitnessAuthority)}");
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(result.OverrideReason))
+            {
+                builder.AppendLine($"  - Override reason: {result.OverrideReason}");
+            }
+
             if (!string.IsNullOrWhiteSpace(result.MeasuredValue))
             {
                 builder.AppendLine($"  - Measured: {result.MeasuredValue}");

@@ -35,6 +35,8 @@ public sealed class ExecutionService
                 TrimToNull(request.Comments),
                 request.CapturedInputValues,
                 request.SupersedesResultEntryId,
+                TrimToNull(request.WitnessedBy),
+                TrimToNull(request.OverrideReason),
                 request.ExecutedBy.Trim(),
                 clock()).ResultEntryId);
     }

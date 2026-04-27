@@ -80,6 +80,10 @@ public sealed class TestItem
         string? comments,
         IReadOnlyList<CapturedTestInputValue>? capturedInputValues,
         Guid? supersedesResultEntryId,
+        string? witnessedBy,
+        DateTimeOffset? witnessedAt,
+        AuthorityStamp? witnessAuthority,
+        string? overrideReason,
         string executedBy,
         DateTimeOffset executedAt,
         AuthorityStamp? authority = null)
@@ -106,6 +110,33 @@ public sealed class TestItem
             throw new InvalidOperationException("This test requires comments when the result is Fail.");
         }
 
+        if (BehaviourRules.RequiresWitness && string.IsNullOrWhiteSpace(witnessedBy))
+        {
+            throw new InvalidOperationException("This test requires a witness before a result can be recorded.");
+        }
+
+        if (!BehaviourRules.RequiresWitness &&
+            (!string.IsNullOrWhiteSpace(witnessedBy) || witnessAuthority is not null || witnessedAt is not null))
+        {
+            throw new InvalidOperationException("Witness details can only be recorded when the test requires a witness.");
+        }
+
+        if (BehaviourRules.RequiresWitness &&
+            string.Equals(witnessedBy?.Trim(), executedBy.Trim(), StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Witness must be different from the test executor.");
+        }
+
+        if (!BehaviourRules.AllowOverrideWithReason && !string.IsNullOrWhiteSpace(overrideReason))
+        {
+            throw new InvalidOperationException("Override reason can only be recorded when this test allows override with reason.");
+        }
+
+        if (result != TestResult.Fail && !string.IsNullOrWhiteSpace(overrideReason))
+        {
+            throw new InvalidOperationException("Override reason can only be recorded against a failed result.");
+        }
+
         if (supersedesResultEntryId is not null && ResultHistory.All(r => r.ResultEntryId != supersedesResultEntryId.Value))
         {
             throw new InvalidOperationException("Superseded result entry was not found on this test item.");
@@ -120,12 +151,37 @@ public sealed class TestItem
             comments,
             capturedInputValues,
             supersedesResultEntryId,
+            witnessedBy,
+            witnessedAt,
+            witnessAuthority,
+            overrideReason,
             executedBy,
             executedAt,
             authority);
 
         ResultHistory.Add(entry);
         return entry;
+    }
+
+    public bool LatestFailureBlocksProgression()
+    {
+        var latest = ResultHistory.LastOrDefault();
+        if (latest?.Result != TestResult.Fail)
+        {
+            return false;
+        }
+
+        if (!BehaviourRules.BlockProgressionIfFailed)
+        {
+            return false;
+        }
+
+        if (BehaviourRules.AllowOverrideWithReason && !string.IsNullOrWhiteSpace(latest.OverrideReason))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private void ValidateCapturedInputs(IReadOnlyList<CapturedTestInputValue>? capturedInputValues)

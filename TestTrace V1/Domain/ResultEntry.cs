@@ -8,6 +8,10 @@ public sealed class ResultEntry
     public string? Comments { get; init; }
     public List<CapturedTestInputValue> CapturedInputValues { get; init; } = [];
     public Guid? SupersedesResultEntryId { get; init; }
+    public string? WitnessedBy { get; init; }
+    public DateTimeOffset? WitnessedAt { get; init; }
+    public AuthorityStamp? WitnessAuthority { get; init; }
+    public string? OverrideReason { get; init; }
     public string ExecutedBy { get; init; } = string.Empty;
     public DateTimeOffset ExecutedAt { get; init; }
     public AuthorityStamp? Authority { get; init; }
@@ -19,6 +23,10 @@ public sealed class ResultEntry
         string? comments,
         IReadOnlyList<CapturedTestInputValue>? capturedInputValues,
         Guid? supersedesResultEntryId,
+        string? witnessedBy,
+        DateTimeOffset? witnessedAt,
+        AuthorityStamp? witnessAuthority,
+        string? overrideReason,
         string executedBy,
         DateTimeOffset executedAt,
         AuthorityStamp? authority = null)
@@ -31,6 +39,10 @@ public sealed class ResultEntry
             Comments = string.IsNullOrWhiteSpace(comments) ? null : comments,
             CapturedInputValues = NormalizeCapturedInputs(capturedInputValues),
             SupersedesResultEntryId = supersedesResultEntryId,
+            WitnessedBy = string.IsNullOrWhiteSpace(witnessedBy) ? null : witnessedBy.Trim(),
+            WitnessedAt = witnessedAt,
+            WitnessAuthority = witnessAuthority,
+            OverrideReason = string.IsNullOrWhiteSpace(overrideReason) ? null : overrideReason.Trim(),
             ExecutedBy = executedBy,
             ExecutedAt = executedAt,
             Authority = authority

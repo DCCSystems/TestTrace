@@ -560,6 +560,8 @@ public sealed class TestTraceProject
         string? comments,
         IReadOnlyList<CapturedTestInputValue>? capturedInputValues,
         Guid? supersedesResultEntryId,
+        string? witnessedBy,
+        string? overrideReason,
         string executedBy,
         DateTimeOffset executedAt)
     {
@@ -578,12 +580,34 @@ public sealed class TestTraceProject
             testItemId,
             executedAt);
 
+        AuthorityStamp? witnessAuthority = null;
+        DateTimeOffset? witnessedAt = null;
+        if (testItem.BehaviourRules.RequiresWitness)
+        {
+            if (string.IsNullOrWhiteSpace(witnessedBy))
+            {
+                throw new InvalidOperationException("This test requires a witness before a result can be recorded.");
+            }
+
+            witnessAuthority = RequireAuthorityStamp(
+                witnessedBy.Trim(),
+                AuthorityRole.Witness,
+                AuthorityScopeType.TestItem,
+                testItemId,
+                executedAt);
+            witnessedAt = executedAt;
+        }
+
         var entry = testItem.RecordResult(
           result,
           measuredValue,
           comments,
           capturedInputValues,
           supersedesResultEntryId,
+          witnessedBy,
+          witnessedAt,
+          witnessAuthority,
+          overrideReason,
           executedBy,
           executedAt,
           authority);
@@ -1107,6 +1131,7 @@ public sealed class TestTraceProject
                 AuthorityRole.FinalApprovalAuthority => scopeType == AuthorityScopeType.Project,
                 AuthorityRole.LeadTestEngineer => scopeType == AuthorityScopeType.Project,
                 AuthorityRole.ContractAuthor => scopeType == AuthorityScopeType.Project,
+                AuthorityRole.Witness => scopeType is AuthorityScopeType.TestItem or AuthorityScopeType.Project,
                 _ => false
             };
         }

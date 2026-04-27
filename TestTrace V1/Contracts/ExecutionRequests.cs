@@ -11,6 +11,8 @@ public sealed class RecordResultRequest
     public string? Comments { get; init; }
     public IReadOnlyList<CapturedTestInputValue> CapturedInputValues { get; init; } = [];
     public Guid? SupersedesResultEntryId { get; init; }
+    public string? WitnessedBy { get; init; }
+    public string? OverrideReason { get; init; }
     public string ExecutedBy { get; init; } = string.Empty;
 }
 

@@ -237,6 +237,22 @@ internal static class Program
                 return;
             }
 
+            var assignAndyWitness = usersAuthority.AssignAuthority(new AssignAuthorityRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                UserId = andyId,
+                Role = AuthorityRole.Witness,
+                ScopeType = AuthorityScopeType.Project,
+                ScopeId = buildResult.Project.ProjectId,
+                Reason = "Andy witnesses smoke execution results.",
+                Actor = "Smoke Test"
+            });
+            if (!assignAndyWitness.Succeeded || assignAndyWitness.TargetId is null)
+            {
+                FailSmoke(assignAndyWitness.ErrorMessage, assignAndyWitness.Validation.Issues);
+                return;
+            }
+
             var updateMetadata = workspace.UpdateProjectMetadata(new UpdateProjectMetadataRequest
             {
                 ProjectFolderPath = buildResult.ProjectFolderPath,
@@ -498,7 +514,7 @@ internal static class Program
                 ProjectFolderPath = buildResult.ProjectFolderPath,
                 SectionId = sectionResult.TargetId.Value,
                 AssetId = componentResult.TargetId.Value,
-                TestReference = "T-004",
+                TestReference = "VIS-NP-001",
                 TestTitle = "Nameplate check",
                 TestDescription = "Confirm the motor nameplate is present and legible.",
                 ExpectedOutcome = "Nameplate details can be read.",
@@ -508,6 +524,30 @@ internal static class Program
             if (!simpleTestResult.Succeeded || simpleTestResult.TargetId is null)
             {
                 FailSmoke(simpleTestResult.ErrorMessage, simpleTestResult.Validation.Issues);
+                return;
+            }
+
+            var overrideFailTestResult = workspace.AddTestItem(new AddTestItemRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                SectionId = sectionResult.TargetId.Value,
+                AssetId = componentResult.TargetId.Value,
+                TestReference = "OVR-001",
+                TestTitle = "Documented exception check",
+                TestDescription = "Confirm failed condition can be accepted only by an explicit override reason.",
+                ExpectedOutcome = "Failure is either resolved or accepted by controlled exception.",
+                AcceptanceCriteria = AcceptanceCriteria.ManualConfirmation(),
+                EvidenceRequirements = EvidenceRequirements.None(),
+                BehaviourRules = TestBehaviourRules.Create(
+                    blockProgressionIfFailed: true,
+                    allowOverrideWithReason: true,
+                    requiresWitness: false),
+                Actor = "Smoke Test"
+            });
+
+            if (!overrideFailTestResult.Succeeded || overrideFailTestResult.TargetId is null)
+            {
+                FailSmoke(overrideFailTestResult.ErrorMessage, overrideFailTestResult.Validation.Issues);
                 return;
             }
 
@@ -910,6 +950,7 @@ internal static class Program
                 TestItemId = testResult.TargetId.Value,
                 Result = TestResult.Pass,
                 Comments = "This should be blocked because required structured inputs are missing.",
+                WitnessedBy = "Andy Davis",
                 ExecutedBy = "Smoke Test"
             });
 
@@ -954,6 +995,7 @@ internal static class Program
                     CapturedTestInputValue.Create(l3VoltageInputId, "399"),
                     CapturedTestInputValue.Create(rotationDirectionInputId, "maybe")
                 ],
+                WitnessedBy = "Andy Davis",
                 ExecutedBy = "Smoke Test"
             });
 
@@ -977,6 +1019,7 @@ internal static class Program
                     CapturedTestInputValue.Create(l3VoltageInputId, "399"),
                     CapturedTestInputValue.Create(rotationDirectionInputId, "true")
                 ],
+                WitnessedBy = "Andy Davis",
                 ExecutedBy = "Smoke Test"
             });
 
@@ -1001,6 +1044,7 @@ internal static class Program
                     CapturedTestInputValue.Create(rotationDirectionInputId, "true")
                 ],
                 SupersedesResultEntryId = resultEntry.TargetId.Value,
+                WitnessedBy = "Andy Davis",
                 ExecutedBy = "Smoke Test"
             });
 
@@ -1042,6 +1086,52 @@ internal static class Program
             if (!simpleResultEntry.Succeeded || simpleResultEntry.TargetId is null)
             {
                 FailSmoke(simpleResultEntry.ErrorMessage, simpleResultEntry.Validation.Issues);
+                return;
+            }
+
+            var overrideFailWithoutReason = execution.RecordResult(new RecordResultRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                TestItemId = overrideFailTestResult.TargetId.Value,
+                Result = TestResult.Fail,
+                Comments = "This should be blocked at approval because no override reason exists.",
+                ExecutedBy = "Smoke Test"
+            });
+
+            if (!overrideFailWithoutReason.Succeeded || overrideFailWithoutReason.TargetId is null)
+            {
+                FailSmoke(overrideFailWithoutReason.ErrorMessage, overrideFailWithoutReason.Validation.Issues);
+                return;
+            }
+
+            var approvalWithBlockingFailure = approval.ApproveSection(new ApproveSectionRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                SectionId = sectionResult.TargetId.Value,
+                ApprovedBy = "Dan Chetwyn",
+                Comments = "This should be blocked because the failed test has no override reason."
+            });
+
+            if (approvalWithBlockingFailure.Succeeded)
+            {
+                FailSmoke("section approval was allowed while a failed test still blocked progression.");
+                return;
+            }
+
+            var overrideFailWithReason = execution.RecordResult(new RecordResultRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                TestItemId = overrideFailTestResult.TargetId.Value,
+                Result = TestResult.Fail,
+                Comments = "Failure accepted as a controlled exception for smoke coverage.",
+                OverrideReason = "Customer accepted documented deviation for smoke validation.",
+                SupersedesResultEntryId = overrideFailWithoutReason.TargetId.Value,
+                ExecutedBy = "Smoke Test"
+            });
+
+            if (!overrideFailWithReason.Succeeded || overrideFailWithReason.TargetId is null)
+            {
+                FailSmoke(overrideFailWithReason.ErrorMessage, overrideFailWithReason.Validation.Issues);
                 return;
             }
 
@@ -1210,7 +1300,7 @@ internal static class Program
                 return;
             }
 
-            if (loaded.Assets.Count != 3 || loaded.Sections.Count != 3 || loaded.Sections[0].Assets.Count != 1 || loaded.Sections[0].TestItems.Count != 4)
+            if (loaded.Assets.Count != 3 || loaded.Sections.Count != 3 || loaded.Sections[0].Assets.Count != 1 || loaded.Sections[0].TestItems.Count != 5)
             {
                 FailSmoke("asset/section/test structure was not persisted.");
                 return;
@@ -1298,6 +1388,25 @@ internal static class Program
                 loadedLatestResult.Authority.DisplayName != "Smoke Test")
             {
                 FailSmoke("result authority stamp was not persisted.");
+                return;
+            }
+
+            if (loadedLatestResult.WitnessAuthority is null ||
+                loadedLatestResult.WitnessAuthority.Role != AuthorityRole.Witness ||
+                loadedLatestResult.WitnessAuthority.ScopeType != AuthorityScopeType.TestItem ||
+                loadedLatestResult.WitnessAuthority.ScopeId != testResult.TargetId.Value ||
+                loadedLatestResult.WitnessedBy != "Andy Davis")
+            {
+                FailSmoke("witness authority stamp was not persisted on the latest result.");
+                return;
+            }
+
+            var loadedOverrideFailTest = loaded.Sections[0].TestItems.Single(testItem => testItem.TestItemId == overrideFailTestResult.TargetId.Value);
+            if (loadedOverrideFailTest.LatestResult != TestResult.Fail ||
+                string.IsNullOrWhiteSpace(loadedOverrideFailTest.ResultHistory[^1].OverrideReason) ||
+                loadedOverrideFailTest.LatestFailureBlocksProgression())
+            {
+                FailSmoke("override-with-reason failure state was not persisted or still blocked progression.");
                 return;
             }
 
@@ -1543,6 +1652,9 @@ internal static class Program
                 !exportText.Contains("SectionApprover", StringComparison.OrdinalIgnoreCase) ||
                 !exportText.Contains("Authority:", StringComparison.OrdinalIgnoreCase) ||
                 !exportText.Contains("TestExecutor", StringComparison.OrdinalIgnoreCase) ||
+                !exportText.Contains("Witnessed by", StringComparison.OrdinalIgnoreCase) ||
+                !exportText.Contains("Witness authority", StringComparison.OrdinalIgnoreCase) ||
+                !exportText.Contains("Override reason", StringComparison.OrdinalIgnoreCase) ||
                 !exportText.Contains("Release authority stamp", StringComparison.OrdinalIgnoreCase))
             {
                 FailSmoke("FAT report did not include authority, asset hierarchy, applicability, or test acceptance/evidence/behaviour/input fields.");

@@ -123,9 +123,9 @@ public sealed class Section
             }
         }
 
-        if (TestItems.Any(t => testIsApplicable(this, t) && t.LatestResult == TestResult.Fail))
+        if (TestItems.Any(t => testIsApplicable(this, t) && t.LatestFailureBlocksProgression()))
         {
-            throw new InvalidOperationException("Section cannot be approved while a latest test result is Fail.");
+            throw new InvalidOperationException("Section cannot be approved while a latest failed test result blocks progression.");
         }
 
         if (TestItems.Any(t => testIsApplicable(this, t) && t.LatestResult == TestResult.NotTested))
