@@ -88,14 +88,31 @@ public sealed class MainForm : Form
         header.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         header.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
+        var brandRow = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 0, 0, 4),
+            WrapContents = false
+        };
+
+        var brandBadge = BrandAssets.CreatePictureBox(
+            BrandAssets.LoadBadge(),
+            new Size(42, 42),
+            new Padding(0, 0, 10, 0));
+        brandRow.Controls.Add(brandBadge);
+
         var title = new Label
         {
             Text = TestTraceAppEnvironment.IsSandbox ? "TestTrace - SANDBOX" : "TestTrace",
             AutoSize = true,
             Font = new Font(Font.FontFamily, 19, FontStyle.Bold),
-            Margin = new Padding(0, 0, 0, 4),
+            Anchor = AnchorStyles.Left,
+            Margin = new Padding(0, 5, 0, 0),
             UseMnemonic = false
         };
+        brandRow.Controls.Add(title);
 
         var subtitle = new Label
         {
@@ -108,7 +125,7 @@ public sealed class MainForm : Form
             UseMnemonic = false
         };
 
-        header.Controls.Add(title, 0, 0);
+        header.Controls.Add(brandRow, 0, 0);
         header.Controls.Add(subtitle, 0, 1);
 
         var operatorPanel = new FlowLayoutPanel

@@ -63,12 +63,19 @@ public sealed class OperatorSelectionForm : Form
         identityLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         identityPanel.Controls.Add(identityLayout);
 
+        var brandMark = BrandAssets.CreatePictureBox(
+            BrandAssets.LoadWordmark(),
+            new Size(238, 54),
+            new Padding(0, 0, 0, 10));
+        identityLayout.Controls.Add(brandMark, 0, 0);
+
         var brandLabel = new Label
         {
             Text = "TestTrace",
             AutoSize = true,
             Font = new Font("Segoe UI", 22, FontStyle.Bold),
-            Margin = new Padding(0, 0, 0, 4),
+            Margin = brandMark.Visible ? new Padding(0) : new Padding(0, 0, 0, 4),
+            Visible = !brandMark.Visible,
             UseMnemonic = false
         };
         identityLayout.Controls.Add(brandLabel, 0, 0);

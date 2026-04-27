@@ -13,4 +13,10 @@
     <Compile Remove="bin\**;obj\**" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Assets\Branding\*.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

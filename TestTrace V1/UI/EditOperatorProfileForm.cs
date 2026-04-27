@@ -89,12 +89,19 @@ public sealed class EditOperatorProfileForm : Form
         heroLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         heroPanel.Controls.Add(heroLayout);
 
+        var productMark = BrandAssets.CreatePictureBox(
+            BrandAssets.LoadWordmark(),
+            new Size(220, 50),
+            new Padding(0, 0, 0, 8));
+        heroLayout.Controls.Add(productMark, 0, 0);
+
         var productLabel = new Label
         {
             Text = "TestTrace",
             AutoSize = true,
             Font = new Font("Segoe UI", 20, FontStyle.Bold),
-            Margin = new Padding(0, 0, 0, 2),
+            Margin = productMark.Visible ? new Padding(0) : new Padding(0, 0, 0, 2),
+            Visible = !productMark.Visible,
             UseMnemonic = false
         };
         heroLayout.Controls.Add(productLabel, 0, 0);
