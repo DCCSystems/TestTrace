@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "TestTrace V1 Sandbox": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "TESTTRACE_PROJECTS_ROOT": "C:\\Users\\Dan\\Desktop\\DCC Systems Backup 17.04.26\\sandbox-data\\TestTraceProjects"
+      }
+    }
+  }
+}
