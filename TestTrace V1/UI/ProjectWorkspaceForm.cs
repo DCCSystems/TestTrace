@@ -39,7 +39,7 @@ public sealed class ProjectWorkspaceForm : Form
     private readonly Button sheetMarkNotApplicableButton = new();
     private readonly Button sheetMarkApplicableButton = new();
     private readonly ListView resultList = CreateListView(("Result", 120), ("By", 160), ("When", 160), ("Measured", 220), ("Comments", 360));
-    private readonly ListView evidenceList = CreateListView(("Stored file", 260), ("Original", 220), ("Attached by", 150), ("SHA-256", 460));
+    private readonly ListView evidenceList = CreateListView(("Stored file", 260), ("Original", 220), ("Type", 110), ("Attached by", 150), ("SHA-256", 460));
     private readonly ListView auditList = CreateListView(("When", 160), ("Actor", 160), ("Action", 180), ("Target", 160), ("Details", 460));
     private readonly ListView contextEvidenceList = CreateListView(("File name", 190), ("Type", 80), ("Added by", 120), ("Timestamp", 130));
     private readonly ListView contextHistoryList = CreateListView(("Result", 90), ("By", 120), ("When", 130), ("Notes", 300));
@@ -1778,6 +1778,7 @@ public sealed class ProjectWorkspaceForm : Form
             ProjectFolderPath = projectFolderPath,
             TestItemId = testItem.TestItemId,
             SourceFilePath = dialog.FileName,
+            EvidenceType = SuggestedEvidenceType(testItem.EvidenceRequirements, dialog.FileName),
             AttachedBy = CurrentActor()
         });
 
@@ -1862,7 +1863,7 @@ public sealed class ProjectWorkspaceForm : Form
         var passed = applicableTests.Count(item => item.TestItem.LatestResult == TestResult.Pass);
         var failed = applicableTests.Count(item => item.TestItem.LatestResult == TestResult.Fail);
         var notTested = applicableTests.Count(item => item.TestItem.LatestResult == TestResult.NotTested);
-        var needsEvidence = applicableTests.Count(item => HasDeclaredEvidenceRequirement(item.TestItem) && item.TestItem.EvidenceRecords.Count == 0);
+        var needsEvidence = applicableTests.Count(item => currentProject.MissingEvidenceTypes(item.TestItem).Count > 0);
 
         RenderOverviewCards(currentProject, applicableTests.Count, passed, failed, notTested, needsEvidence);
         RenderOverviewDetails(currentProject, selectedSection, selectedAsset, selectedTest, scopedTests.Count, applicableTests.Count, notApplicableTests);
@@ -1886,7 +1887,7 @@ public sealed class ProjectWorkspaceForm : Form
         overviewCardsPanel.Controls.Add(CreateMetricCard("Passed", passed.ToString(), "Latest result pass", AppTheme.Current.PassSoftBackground, AppTheme.Current.PassForeground));
         overviewCardsPanel.Controls.Add(CreateMetricCard("Failed", failed.ToString(), "Needs attention", AppTheme.Current.FailSoftBackground, AppTheme.Current.FailForeground));
         overviewCardsPanel.Controls.Add(CreateMetricCard("Not tested", notTested.ToString(), "Still open", AppTheme.Current.SurfaceElevated, AppTheme.Current.TextPrimary));
-        overviewCardsPanel.Controls.Add(CreateMetricCard("Evidence gaps", needsEvidence.ToString(), "Declared evidence, no files", needsEvidence > 0 ? AppTheme.Current.StatusDraftBackground : AppTheme.Current.SurfaceElevated, needsEvidence > 0 ? AppTheme.Current.StatusDraftForeground : AppTheme.Current.TextPrimary));
+        overviewCardsPanel.Controls.Add(CreateMetricCard("Evidence gaps", needsEvidence.ToString(), "Required evidence missing", needsEvidence > 0 ? AppTheme.Current.StatusDraftBackground : AppTheme.Current.SurfaceElevated, needsEvidence > 0 ? AppTheme.Current.StatusDraftForeground : AppTheme.Current.TextPrimary));
         overviewCardsPanel.ResumeLayout();
     }
 
@@ -1985,7 +1986,7 @@ public sealed class ProjectWorkspaceForm : Form
             ("Machine context", currentProject.State == ProjectState.DraftContractBuilt ? "Editable until execution opens" : "Locked after execution opened"),
             ("Execution scope", $"{applicableTests} applicable tests / {totalTests} total"),
             ("Execution status", $"{passed} passed / {failed} failed / {notTested} not tested"),
-            ("Evidence pressure", needsEvidence == 0 ? "No declared evidence gaps visible in this summary." : $"{needsEvidence} applicable test(s) declare evidence but have no evidence records."),
+            ("Evidence pressure", needsEvidence == 0 ? "No required evidence gaps visible in this summary." : $"{needsEvidence} applicable test(s) are missing required evidence types."),
             ("Export action", "Use Export FAT Report from the governed action bar."));
     }
 
@@ -2018,7 +2019,7 @@ public sealed class ProjectWorkspaceForm : Form
             return 0;
         }
 
-        if (testItem.LatestResult == TestResult.Pass && HasDeclaredEvidenceRequirement(testItem) && testItem.EvidenceRecords.Count == 0)
+        if (testItem.LatestResult == TestResult.Pass && currentProject.MissingEvidenceTypes(testItem).Count > 0)
         {
             return 1;
         }
@@ -2048,7 +2049,7 @@ public sealed class ProjectWorkspaceForm : Form
             return "Failed";
         }
 
-        if (testItem.LatestResult == TestResult.Pass && HasDeclaredEvidenceRequirement(testItem) && testItem.EvidenceRecords.Count == 0)
+        if (testItem.LatestResult == TestResult.Pass && currentProject.MissingEvidenceTypes(testItem).Count > 0)
         {
             return "Needs evidence";
         }
@@ -2304,7 +2305,7 @@ public sealed class ProjectWorkspaceForm : Form
             foreach (var evidence in testItem.EvidenceRecords.OrderByDescending(evidence => evidence.AttachedAt))
             {
                 var item = new ListViewItem(evidence.StoredFileName);
-                item.SubItems.Add(evidence.FileExtension);
+                item.SubItems.Add(evidence.EvidenceType.ToString());
                 item.SubItems.Add(evidence.AttachedBy);
                 item.SubItems.Add(evidence.AttachedAt.LocalDateTime.ToString("g"));
                 item.Tag = Path.Combine(projectFolderPath, "evidence", evidence.StoredFileName);
@@ -2403,6 +2404,7 @@ public sealed class ProjectWorkspaceForm : Form
         {
             var item = new ListViewItem(evidence.StoredFileName);
             item.SubItems.Add(evidence.OriginalFileName);
+            item.SubItems.Add(evidence.EvidenceType.ToString());
             item.SubItems.Add(evidence.AttachedBy);
             item.SubItems.Add(evidence.Sha256Hash);
             evidenceList.Items.Add(item);
@@ -3032,7 +3034,7 @@ public sealed class ProjectWorkspaceForm : Form
             return;
         }
 
-        using var form = new AttachEvidenceForm(selected.TestReference, selected.TestTitle);
+        using var form = new AttachEvidenceForm(selected.TestReference, selected.TestTitle, selected.EvidenceRequirements);
         if (form.ShowDialog(this) != DialogResult.OK)
         {
             return;
@@ -3043,6 +3045,7 @@ public sealed class ProjectWorkspaceForm : Form
             ProjectFolderPath = projectFolderPath,
             TestItemId = selected.TestItemId,
             SourceFilePath = form.SourceFilePath,
+            EvidenceType = form.EvidenceType,
             Description = form.Description,
             AttachedBy = CurrentActor()
         });
@@ -3719,10 +3722,24 @@ public sealed class ProjectWorkspaceForm : Form
 
         var fileNames = testItem.EvidenceRecords
             .OrderByDescending(evidence => evidence.AttachedAt)
-            .Select(evidence => "- " + evidence.StoredFileName);
+            .Select(evidence => $"- {evidence.EvidenceType}: {evidence.StoredFileName}");
         return $"{testItem.EvidenceRecords.Count} evidence record(s)" +
             Environment.NewLine +
             string.Join(Environment.NewLine, fileNames);
+    }
+
+    private static EvidenceType SuggestedEvidenceType(EvidenceRequirements requirements, string filePath)
+    {
+        var requiredType = requirements.RequiredEvidenceTypes().FirstOrDefault();
+        if (requiredType != EvidenceType.Other)
+        {
+            return requiredType;
+        }
+
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        return extension is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".gif"
+            ? EvidenceType.Photo
+            : EvidenceType.FileUpload;
     }
 
     private static string HistoryNotes(TestItem testItem, ResultEntry result)

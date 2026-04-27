@@ -999,10 +999,25 @@ public sealed class ExecutionRunnerForm : Form
             ProjectFolderPath = projectFolderPath,
             TestItemId = testItem.TestItemId,
             SourceFilePath = dialog.FileName,
+            EvidenceType = SuggestedEvidenceType(testItem.EvidenceRequirements, dialog.FileName),
             AttachedBy = CurrentActor()
         });
 
         HandleOperation(operation, "Evidence attached.");
+    }
+
+    private static EvidenceType SuggestedEvidenceType(EvidenceRequirements requirements, string filePath)
+    {
+        var requiredType = requirements.RequiredEvidenceTypes().FirstOrDefault();
+        if (requiredType != EvidenceType.Other)
+        {
+            return requiredType;
+        }
+
+        var extension = Path.GetExtension(filePath).ToLowerInvariant();
+        return extension is ".jpg" or ".jpeg" or ".png" or ".bmp" or ".gif"
+            ? EvidenceType.Photo
+            : EvidenceType.FileUpload;
     }
 
     private void HandleOperation(OperationResult operation, string successMessage)

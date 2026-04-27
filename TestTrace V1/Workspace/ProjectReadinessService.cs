@@ -150,7 +150,8 @@ public static class ProjectReadinessService
             .ToList();
         return applicableTests.Count > 0 &&
             !EmptySectionAssets(project, selectedSection).Any() &&
-            applicableTests.All(testItem => testItem.LatestResult is not TestResult.Fail and not TestResult.NotTested);
+            applicableTests.All(testItem => testItem.LatestResult is not TestResult.Fail and not TestResult.NotTested) &&
+            applicableTests.All(testItem => project.MissingEvidenceTypes(testItem).Count == 0);
     }
 
     private static IEnumerable<string> OpenForExecutionIssues(TestTraceProject project)
@@ -243,7 +244,24 @@ public static class ProjectReadinessService
             return "Section cannot be approved while any applicable latest result is failed.";
         }
 
-        return "Section cannot be approved while any applicable test item is not tested.";
+        if (applicableTests.Any(testItem => testItem.LatestResult == TestResult.NotTested))
+        {
+            return "Section cannot be approved while any applicable test item is not tested.";
+        }
+
+        var missingEvidence = applicableTests
+            .Select(testItem => new
+            {
+                TestItem = testItem,
+                Missing = project.MissingEvidenceTypes(testItem)
+            })
+            .FirstOrDefault(item => item.Missing.Count > 0);
+        if (missingEvidence is not null)
+        {
+            return $"{missingEvidence.TestItem.TestReference} requires evidence before approval: {string.Join(", ", missingEvidence.Missing)}.";
+        }
+
+        return "Section cannot be approved yet.";
     }
 
     private static IEnumerable<string> ReleaseIssues(TestTraceProject project)

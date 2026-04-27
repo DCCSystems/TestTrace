@@ -407,6 +407,7 @@ public sealed class ExportService
         {
             builder.AppendLine($"- {evidence.StoredFileName}");
             builder.AppendLine($"  - Original: {evidence.OriginalFileName}");
+            builder.AppendLine($"  - Evidence type: {evidence.EvidenceType}");
             builder.AppendLine($"  - Attached by: {evidence.AttachedBy} at {evidence.AttachedAt.LocalDateTime:g}");
             if (evidence.Authority is not null)
             {

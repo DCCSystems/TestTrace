@@ -879,6 +879,7 @@ internal static class Program
                 ProjectFolderPath = buildResult.ProjectFolderPath,
                 TestItemId = notApplicableTestResult.TargetId.Value,
                 SourceFilePath = sourceEvidence,
+                EvidenceType = EvidenceType.Other,
                 Description = "This should be blocked because the test is not applicable.",
                 AttachedBy = "Smoke Test"
             });
@@ -1065,18 +1066,97 @@ internal static class Program
                 return;
             }
 
-            var evidenceResult = execution.AttachEvidence(new AttachEvidenceRequest
+            var wrongEvidenceTypeResult = execution.AttachEvidence(new AttachEvidenceRequest
             {
                 ProjectFolderPath = buildResult.ProjectFolderPath,
                 TestItemId = testResult.TargetId.Value,
                 SourceFilePath = sourceEvidence,
-                Description = "Smoke evidence file.",
+                EvidenceType = EvidenceType.Other,
+                Description = "Smoke evidence file with the wrong requirement type.",
                 AttachedBy = "Smoke Test"
             });
 
-            if (!evidenceResult.Succeeded || evidenceResult.TargetId is null)
+            if (!wrongEvidenceTypeResult.Succeeded || wrongEvidenceTypeResult.TargetId is null)
             {
-                FailSmoke(evidenceResult.ErrorMessage, evidenceResult.Validation.Issues);
+                FailSmoke(wrongEvidenceTypeResult.ErrorMessage, wrongEvidenceTypeResult.Validation.Issues);
+                return;
+            }
+
+            var approvalWithMissingEvidence = approval.ApproveSection(new ApproveSectionRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                SectionId = sectionResult.TargetId.Value,
+                ApprovedBy = "Dan Chetwyn",
+                Comments = "This should be blocked because required evidence types are missing."
+            });
+
+            if (approvalWithMissingEvidence.Succeeded)
+            {
+                FailSmoke("section approval was allowed while required evidence types were missing.");
+                return;
+            }
+
+            var photoEvidenceResult = execution.AttachEvidence(new AttachEvidenceRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                TestItemId = testResult.TargetId.Value,
+                SourceFilePath = sourceEvidence,
+                EvidenceType = EvidenceType.Photo,
+                Description = "Smoke photo evidence file.",
+                AttachedBy = "Smoke Test"
+            });
+
+            if (!photoEvidenceResult.Succeeded || photoEvidenceResult.TargetId is null)
+            {
+                FailSmoke(photoEvidenceResult.ErrorMessage, photoEvidenceResult.Validation.Issues);
+                return;
+            }
+
+            var measurementEvidenceResult = execution.AttachEvidence(new AttachEvidenceRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                TestItemId = testResult.TargetId.Value,
+                SourceFilePath = sourceEvidence,
+                EvidenceType = EvidenceType.Measurement,
+                Description = "Smoke measurement evidence file.",
+                AttachedBy = "Smoke Test"
+            });
+
+            if (!measurementEvidenceResult.Succeeded || measurementEvidenceResult.TargetId is null)
+            {
+                FailSmoke(measurementEvidenceResult.ErrorMessage, measurementEvidenceResult.Validation.Issues);
+                return;
+            }
+
+            var fileUploadEvidenceResult = execution.AttachEvidence(new AttachEvidenceRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                TestItemId = testResult.TargetId.Value,
+                SourceFilePath = sourceEvidence,
+                EvidenceType = EvidenceType.FileUpload,
+                Description = "Smoke file upload evidence file.",
+                AttachedBy = "Smoke Test"
+            });
+
+            if (!fileUploadEvidenceResult.Succeeded || fileUploadEvidenceResult.TargetId is null)
+            {
+                FailSmoke(fileUploadEvidenceResult.ErrorMessage, fileUploadEvidenceResult.Validation.Issues);
+                return;
+            }
+
+            var subAssetMeasurementEvidenceResult = execution.AttachEvidence(new AttachEvidenceRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                TestItemId = subAssetTestResult.TargetId.Value,
+                SourceFilePath = sourceEvidence,
+                EvidenceType = EvidenceType.Measurement,
+                Description = "Smoke encoder measurement evidence file.",
+                AttachedBy = "Smoke Test"
+            });
+
+            if (!subAssetMeasurementEvidenceResult.Succeeded || subAssetMeasurementEvidenceResult.TargetId is null)
+            {
+                FailSmoke(subAssetMeasurementEvidenceResult.ErrorMessage, subAssetMeasurementEvidenceResult.Validation.Issues);
                 return;
             }
 
@@ -1251,9 +1331,20 @@ internal static class Program
                 return;
             }
 
-            if (loadedTestItem.EvidenceRecords.Count != 1)
+            if (loadedTestItem.EvidenceRecords.Count != 4 ||
+                loadedTestItem.EvidenceRecords.All(evidence => evidence.EvidenceType != EvidenceType.Photo) ||
+                loadedTestItem.EvidenceRecords.All(evidence => evidence.EvidenceType != EvidenceType.Measurement) ||
+                loadedTestItem.EvidenceRecords.All(evidence => evidence.EvidenceType != EvidenceType.FileUpload) ||
+                loadedTestItem.EvidenceRecords.All(evidence => evidence.EvidenceType != EvidenceType.Other))
             {
-                FailSmoke("evidence record was not persisted.");
+                FailSmoke("typed evidence records were not persisted.");
+                return;
+            }
+
+            if (loadedSubAssetTestItem.EvidenceRecords.Count != 1 ||
+                loadedSubAssetTestItem.EvidenceRecords[0].EvidenceType != EvidenceType.Measurement)
+            {
+                FailSmoke("sub-asset typed measurement evidence was not persisted.");
                 return;
             }
 
@@ -1428,6 +1519,10 @@ internal static class Program
             var exportText = File.ReadAllText(export.FilePath);
             if (!exportText.Contains("Acceptance criteria", StringComparison.OrdinalIgnoreCase) ||
                 !exportText.Contains("Evidence requirements", StringComparison.OrdinalIgnoreCase) ||
+                !exportText.Contains("Evidence type", StringComparison.OrdinalIgnoreCase) ||
+                !exportText.Contains("Photo", StringComparison.OrdinalIgnoreCase) ||
+                !exportText.Contains("Measurement", StringComparison.OrdinalIgnoreCase) ||
+                !exportText.Contains("FileUpload", StringComparison.OrdinalIgnoreCase) ||
                 !exportText.Contains("Behaviour", StringComparison.OrdinalIgnoreCase) ||
                 !exportText.Contains("Test inputs", StringComparison.OrdinalIgnoreCase) ||
                 !exportText.Contains("L1 Voltage", StringComparison.OrdinalIgnoreCase) ||

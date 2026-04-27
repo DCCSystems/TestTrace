@@ -19,6 +19,7 @@ public sealed class AttachEvidenceRequest
     public string ProjectFolderPath { get; init; } = string.Empty;
     public Guid TestItemId { get; init; }
     public string SourceFilePath { get; init; } = string.Empty;
+    public EvidenceType EvidenceType { get; init; } = EvidenceType.Other;
     public string? Description { get; init; }
     public string AttachedBy { get; init; } = string.Empty;
 }

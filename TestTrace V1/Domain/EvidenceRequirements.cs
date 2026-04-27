@@ -81,4 +81,30 @@ public sealed class EvidenceRequirements
 
         return requirements.Count == 0 ? "No explicit evidence requirements" : string.Join(", ", requirements);
     }
+
+    public IReadOnlyList<EvidenceType> RequiredEvidenceTypes()
+    {
+        var types = new List<EvidenceType>();
+        if (PhotoRequired)
+        {
+            types.Add(EvidenceType.Photo);
+        }
+
+        if (MeasurementRequired)
+        {
+            types.Add(EvidenceType.Measurement);
+        }
+
+        if (SignatureRequired)
+        {
+            types.Add(EvidenceType.Signature);
+        }
+
+        if (FileUploadRequired)
+        {
+            types.Add(EvidenceType.FileUpload);
+        }
+
+        return types;
+    }
 }

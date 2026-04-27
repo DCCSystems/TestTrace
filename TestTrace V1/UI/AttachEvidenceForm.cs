@@ -1,34 +1,41 @@
+using TestTrace_V1.Domain;
+
 namespace TestTrace_V1.UI;
 
 public sealed class AttachEvidenceForm : Form
 {
     private readonly TextBox filePathTextBox = new();
+    private readonly ComboBox evidenceTypeComboBox = new();
     private readonly TextBox descriptionTextBox = new();
 
     public string SourceFilePath => filePathTextBox.Text.Trim();
+    public EvidenceType EvidenceType => evidenceTypeComboBox.SelectedItem is EvidenceType evidenceType
+        ? evidenceType
+        : EvidenceType.Other;
     public string? Description => string.IsNullOrWhiteSpace(descriptionTextBox.Text) ? null : descriptionTextBox.Text.Trim();
 
-    public AttachEvidenceForm(string testReference, string testTitle)
+    public AttachEvidenceForm(string testReference, string testTitle, EvidenceRequirements? requirements = null)
     {
         Text = $"Attach Evidence - {testReference}";
         MinimumSize = new Size(700, 360);
         StartPosition = FormStartPosition.CenterParent;
-                InitializeLayout(testReference, testTitle);
+        InitializeLayout(testReference, testTitle, requirements);
         AppTheme.Apply(this);
     }
 
-    private void InitializeLayout(string testReference, string testTitle)
+    private void InitializeLayout(string testReference, string testTitle, EvidenceRequirements? requirements)
     {
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 3,
-            RowCount = 4,
+            RowCount = 5,
             Padding = new Padding(16)
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
@@ -52,12 +59,22 @@ public sealed class AttachEvidenceForm : Form
         browseButton.Click += (_, _) => BrowseFile();
         layout.Controls.Add(browseButton, 2, 1);
 
-        AddLabel(layout, "Description", 2);
+        AddLabel(layout, "Evidence type", 2);
+        evidenceTypeComboBox.DropDownStyle = ComboBoxStyle.DropDownList;
+        evidenceTypeComboBox.Items.AddRange(Enum.GetValues<EvidenceType>().Cast<object>().ToArray());
+        evidenceTypeComboBox.SelectedItem = SuggestedEvidenceType(requirements);
+        evidenceTypeComboBox.Dock = DockStyle.Left;
+        evidenceTypeComboBox.Width = 220;
+        evidenceTypeComboBox.Margin = new Padding(0, 0, 0, 8);
+        layout.Controls.Add(evidenceTypeComboBox, 1, 2);
+        layout.SetColumnSpan(evidenceTypeComboBox, 2);
+
+        AddLabel(layout, "Description", 3);
         descriptionTextBox.Dock = DockStyle.Fill;
         descriptionTextBox.Multiline = true;
         descriptionTextBox.ScrollBars = ScrollBars.Vertical;
         descriptionTextBox.Margin = new Padding(0, 0, 0, 8);
-        layout.Controls.Add(descriptionTextBox, 1, 2);
+        layout.Controls.Add(descriptionTextBox, 1, 3);
         layout.SetColumnSpan(descriptionTextBox, 2);
 
         var actions = new FlowLayoutPanel
@@ -72,10 +89,15 @@ public sealed class AttachEvidenceForm : Form
         cancelButton.Click += (_, _) => DialogResult = DialogResult.Cancel;
         actions.Controls.Add(attachButton);
         actions.Controls.Add(cancelButton);
-        layout.Controls.Add(actions, 0, 3);
+        layout.Controls.Add(actions, 0, 4);
         layout.SetColumnSpan(actions, 3);
 
         Controls.Add(layout);
+    }
+
+    private static EvidenceType SuggestedEvidenceType(EvidenceRequirements? requirements)
+    {
+        return requirements?.RequiredEvidenceTypes().FirstOrDefault() ?? EvidenceType.Other;
     }
 
     private void BrowseFile()

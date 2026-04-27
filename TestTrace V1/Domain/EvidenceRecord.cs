@@ -7,6 +7,7 @@ public sealed class EvidenceRecord
     public string StoredFileName { get; init; } = string.Empty;
     public string FileExtension { get; init; } = string.Empty;
     public string Sha256Hash { get; init; } = string.Empty;
+    public EvidenceType EvidenceType { get; init; } = EvidenceType.Other;
     public string? Description { get; init; }
     public Guid TestItemId { get; init; }
     public string AttachedBy { get; init; } = string.Empty;
@@ -19,6 +20,7 @@ public sealed class EvidenceRecord
         string storedFileName,
         string fileExtension,
         string sha256Hash,
+        EvidenceType evidenceType,
         string? description,
         Guid testItemId,
         string attachedBy,
@@ -32,6 +34,7 @@ public sealed class EvidenceRecord
             StoredFileName = storedFileName,
             FileExtension = fileExtension,
             Sha256Hash = sha256Hash,
+            EvidenceType = evidenceType,
             Description = string.IsNullOrWhiteSpace(description) ? null : description,
             TestItemId = testItemId,
             AttachedBy = attachedBy,

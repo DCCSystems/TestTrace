@@ -615,6 +615,8 @@ public sealed class TestTraceProject
         EnsureExecutable();
 
         var section = FindSection(sectionId);
+        EnsureEvidenceRequirementsSatisfied(section);
+
         var approvalRole = SectionApprovalRoleFor(section, approvedBy);
         var approvalScopeType = approvalRole == AuthorityRole.SectionApprover
             ? AuthorityScopeType.Section
@@ -1436,6 +1438,36 @@ public sealed class TestTraceProject
         }
 
         return testItem.Applicability == ApplicabilityState.Applicable;
+    }
+
+    private void EnsureEvidenceRequirementsSatisfied(Section section)
+    {
+        if (section.Applicability == ApplicabilityState.NotApplicable)
+        {
+            return;
+        }
+
+        foreach (var testItem in section.TestItems.Where(testItem => IsTestApplicable(section, testItem)))
+        {
+            var missingTypes = MissingEvidenceTypes(testItem).ToList();
+            if (missingTypes.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"{testItem.TestReference} requires evidence before approval: {string.Join(", ", missingTypes)}.");
+            }
+        }
+    }
+
+    public IReadOnlyList<EvidenceType> MissingEvidenceTypes(TestItem testItem)
+    {
+        var attachedTypes = testItem.EvidenceRecords
+            .Select(evidence => evidence.EvidenceType)
+            .ToHashSet();
+
+        return testItem.EvidenceRequirements
+            .RequiredEvidenceTypes()
+            .Where(type => !attachedTypes.Contains(type))
+            .ToList();
     }
 
     private SectionAsset? SectionAssetForTest(Section section, TestItem testItem)

@@ -85,6 +85,7 @@ public sealed class ExecutionService
                 storedFileName,
                 sourceFile.Extension,
                 hash,
+                request.EvidenceType,
                 request.Description,
                 request.TestItemId,
                 request.AttachedBy.Trim(),
@@ -178,6 +179,11 @@ public sealed class ExecutionService
         if (request.TestItemId == Guid.Empty)
         {
             issues.Add(Error("Required", "Test item id is required.", nameof(request.TestItemId)));
+        }
+
+        if (!Enum.IsDefined(request.EvidenceType))
+        {
+            issues.Add(Error("InvalidEvidenceType", "Evidence type is invalid.", nameof(request.EvidenceType)));
         }
 
         if (string.IsNullOrWhiteSpace(request.SourceFilePath))
