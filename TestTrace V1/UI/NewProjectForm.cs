@@ -86,8 +86,8 @@ public sealed class NewProjectForm : Form
             RowCount = 4,
             Padding = new Padding(18)
         };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 62));
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 38));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 430));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 110));
@@ -98,7 +98,7 @@ public sealed class NewProjectForm : Form
         layout.SetColumnSpan(header, 2);
 
         stepHostPanel.Dock = DockStyle.Fill;
-        stepHostPanel.Padding = new Padding(0, 12, 12, 0);
+        stepHostPanel.Padding = new Padding(0, 12, 18, 0);
         CreateStepPanels();
         layout.Controls.Add(stepHostPanel, 0, 1);
 
@@ -183,7 +183,7 @@ public sealed class NewProjectForm : Form
         summaryTable.Dock = DockStyle.Top;
         summaryTable.AutoSize = true;
         summaryTable.ColumnCount = 2;
-        summaryTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 182));
+        summaryTable.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
         summaryTable.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         panel.Controls.Add(title, 0, 0);
@@ -595,11 +595,11 @@ public sealed class NewProjectForm : Form
     {
         var fields = new TableLayoutPanel
         {
-            Dock = DockStyle.Top,
-            AutoSize = true,
+            Dock = DockStyle.Fill,
+            AutoSize = false,
             ColumnCount = 3
         };
-        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 250));
+        fields.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 220));
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         return fields;

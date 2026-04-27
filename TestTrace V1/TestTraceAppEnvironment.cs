@@ -4,18 +4,29 @@ public static class TestTraceAppEnvironment
 {
     public const string ProjectsRootEnvironmentVariable = "TESTTRACE_PROJECTS_ROOT";
 
-    public static bool IsSandbox => SandboxRoot is not null;
+    public static bool IsSandbox => SandboxRoot is not null || IsSandboxProjectsRoot(ConfiguredProjectsRoot);
 
-    public static string ModeLabel => IsSandbox ? "SANDBOX" : "LIVE";
+    public static bool IsCustomRoot => !string.IsNullOrWhiteSpace(ConfiguredProjectsRoot) && !IsSandbox;
+
+    public static string ModeLabel => IsSandbox ? "SANDBOX" : IsCustomRoot ? "CUSTOM ROOT" : "LIVE";
 
     public static string? SandboxRoot => FindSandboxRoot(AppContext.BaseDirectory);
 
+    public static string? ConfiguredProjectsRoot
+    {
+        get
+        {
+            var configuredRoot = Environment.GetEnvironmentVariable(ProjectsRootEnvironmentVariable);
+            return string.IsNullOrWhiteSpace(configuredRoot) ? null : configuredRoot.Trim();
+        }
+    }
+
     public static string DefaultProjectsRoot()
     {
-        var configuredRoot = Environment.GetEnvironmentVariable(ProjectsRootEnvironmentVariable);
+        var configuredRoot = ConfiguredProjectsRoot;
         if (!string.IsNullOrWhiteSpace(configuredRoot))
         {
-            return configuredRoot.Trim();
+            return configuredRoot;
         }
 
         var sandboxRoot = SandboxRoot;
@@ -60,5 +71,33 @@ public static class TestTraceAppEnvironment
         return Directory.Exists(Path.Combine(candidate.FullName, "projects")) &&
             Directory.Exists(Path.Combine(candidate.FullName, "reference")) &&
             Directory.Exists(Path.Combine(candidate.FullName, "workflows"));
+    }
+
+    private static bool IsSandboxProjectsRoot(string? projectsRoot)
+    {
+        if (string.IsNullOrWhiteSpace(projectsRoot))
+        {
+            return false;
+        }
+
+        var fullPath = Path.GetFullPath(projectsRoot);
+        if (fullPath.Contains($"{Path.DirectorySeparatorChar}sandbox-data{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase) ||
+            fullPath.Contains($"{Path.AltDirectorySeparatorChar}sandbox-data{Path.AltDirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var current = new DirectoryInfo(fullPath);
+        while (current is not null)
+        {
+            if (IsKnownSandboxRoot(current))
+            {
+                return true;
+            }
+
+            current = current.Parent;
+        }
+
+        return false;
     }
 }
