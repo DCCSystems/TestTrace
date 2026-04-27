@@ -216,6 +216,12 @@ public sealed class UsersAuthorityForm : Form
         RenderAuthority();
         UpdateUserButtons();
         UpdateAuthorityButtons();
+        addUserButton.Enabled = !IsReleased;
+        assignAuthorityButton.Enabled = !IsReleased;
+        if (IsReleased)
+        {
+            statusLabel.Text = "Released project: users and authority assignments are read-only.";
+        }
     }
 
     private void RenderUsers()
@@ -282,16 +288,18 @@ public sealed class UsersAuthorityForm : Form
     private void UpdateUserButtons()
     {
         var selectedUser = SelectedUser();
-        editUserButton.Enabled = selectedUser is not null;
-        deactivateUserButton.Enabled = selectedUser is { IsActive: true };
-        reactivateUserButton.Enabled = selectedUser is { IsActive: false };
+        editUserButton.Enabled = !IsReleased && selectedUser is not null;
+        deactivateUserButton.Enabled = !IsReleased && selectedUser is { IsActive: true };
+        reactivateUserButton.Enabled = !IsReleased && selectedUser is { IsActive: false };
     }
 
     private void UpdateAuthorityButtons()
     {
         var selected = SelectedAssignment();
-        revokeAuthorityButton.Enabled = selected is { IsActive: true };
+        revokeAuthorityButton.Enabled = !IsReleased && selected is { IsActive: true };
     }
+
+    private bool IsReleased => project?.State == ProjectState.Released;
 
     private UserAccount? SelectedUser()
     {

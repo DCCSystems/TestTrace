@@ -937,6 +937,16 @@ public sealed class ExecutionRunnerForm : Form
     private void RecordResult(RunnerCardTag tag, TestResult result, string? comment, IReadOnlyList<CapturedTestInputValue> capturedInputValues)
     {
         var testItem = FindTestItem(tag.TestItemId);
+        if (testItem is null)
+        {
+            return;
+        }
+
+        if (!TryCollectExecutionGovernance(testItem, result, out var witnessedBy, out var overrideReason))
+        {
+            return;
+        }
+
         var latest = testItem?.ResultHistory.OrderByDescending(entry => entry.ExecutedAt).FirstOrDefault();
         var operation = executionService.RecordResult(new RecordResultRequest
         {
@@ -946,6 +956,8 @@ public sealed class ExecutionRunnerForm : Form
             Comments = comment,
             CapturedInputValues = capturedInputValues,
             SupersedesResultEntryId = latest?.ResultEntryId,
+            WitnessedBy = witnessedBy,
+            OverrideReason = overrideReason,
             ExecutedBy = CurrentActor()
         });
 
@@ -974,10 +986,37 @@ public sealed class ExecutionRunnerForm : Form
             Comments = comment,
             CapturedInputValues = latest.CapturedInputValues,
             SupersedesResultEntryId = latest.ResultEntryId,
+            WitnessedBy = latest.WitnessedBy,
+            OverrideReason = latest.OverrideReason,
             ExecutedBy = CurrentActor()
         });
 
         HandleOperation(operation, "Observation recorded.");
+    }
+
+    private bool TryCollectExecutionGovernance(
+        TestItem testItem,
+        TestResult result,
+        out string? witnessedBy,
+        out string? overrideReason)
+    {
+        witnessedBy = null;
+        overrideReason = null;
+
+        if (!ExecutionGovernanceForm.IsRequiredFor(testItem, result))
+        {
+            return true;
+        }
+
+        using var form = new ExecutionGovernanceForm(testItem, result, CurrentActor());
+        if (form.ShowDialog(this) != DialogResult.OK)
+        {
+            return false;
+        }
+
+        witnessedBy = form.WitnessedBy;
+        overrideReason = form.OverrideReason;
+        return true;
     }
 
     private void AttachEvidence(TestItem testItem)

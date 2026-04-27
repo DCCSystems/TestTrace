@@ -150,7 +150,7 @@ public static class ProjectReadinessService
             .ToList();
         return applicableTests.Count > 0 &&
             !EmptySectionAssets(project, selectedSection).Any() &&
-            applicableTests.All(testItem => testItem.LatestResult is not TestResult.Fail and not TestResult.NotTested) &&
+            applicableTests.All(testItem => !testItem.LatestFailureBlocksProgression() && testItem.LatestResult != TestResult.NotTested) &&
             applicableTests.All(testItem => project.MissingEvidenceTypes(testItem).Count == 0);
     }
 
@@ -239,9 +239,9 @@ public static class ProjectReadinessService
             return emptyAsset;
         }
 
-        if (applicableTests.Any(testItem => testItem.LatestResult == TestResult.Fail))
+        if (applicableTests.Any(testItem => testItem.LatestFailureBlocksProgression()))
         {
-            return "Section cannot be approved while any applicable latest result is failed.";
+            return "Section cannot be approved while any applicable latest failed result blocks progression.";
         }
 
         if (applicableTests.Any(testItem => testItem.LatestResult == TestResult.NotTested))

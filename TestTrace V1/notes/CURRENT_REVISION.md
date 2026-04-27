@@ -1,22 +1,31 @@
 # Current TestTrace Revision
 
-Current open revision: `R002_operator_identity_ui_2026-04-26`
+Current open revision: `R003_governed_execution_continuity_2026-04-27`
 
-Baseline snapshot:
+Active source tree:
 
-`C:\Users\Dan\Desktop\DCC Systems Backup 17.04.26\projects\TestTrace-governance\architecture\TestTrace\revisions\R001_authority_operator_baseline_2026-04-26`
+`C:\Users\Dan\DCC Systems\projects\testtrace-governance\architecture\TestTrace`
+
+Active application:
+
+`C:\Users\Dan\DCC Systems\projects\testtrace-governance\architecture\TestTrace\TestTrace V1`
 
 ## Active Intent
 
-Refine the operator profile creation and sign-in experience.
+Close the continuity gaps between the strengthened governed backend and the WinForms operator/workspace UI.
 
-The current backend/authority baseline is preserved as R001. R002 should focus on making the local operator identity flow feel modern, deliberate, and product-grade while keeping domain and workflow behavior stable.
+The current backend now enforces authority assignments, typed evidence requirements, witness requirements, override-with-reason behaviour, released-project authority immutability, and structured input type validation.
 
 ## Guardrails
 
-- Backup workspace only.
-- Do not touch `C:\Users\Dan\DCC Systems`.
-- UI/interaction work first.
-- Keep build and smoke green.
-- Do not start evidence enforcement in this revision unless Dan explicitly redirects.
+- Keep `TestTrace V1` as the active app.
+- Treat `TestTrace.UI` as legacy/reference unless Dan explicitly reactivates it.
+- Keep build and smoke green after every governed workflow change.
+- Domain and services remain the source of authority; UI surfaces collect intent and display guard reasons.
+- Released projects are final records. User and authority mutation screens must present them as read-only.
 
+## Current Focus
+
+- Execution UI must collect witness and override details when a test behaviour requires them.
+- Readiness logic must match domain approval rules.
+- Repo entry docs must stay current enough for future sessions to route safely.

@@ -1710,6 +1710,16 @@ public sealed class ProjectWorkspaceForm : Form
         }
 
         var testItem = FindTestItem(tag.TestItemId);
+        if (testItem is null)
+        {
+            return;
+        }
+
+        if (!TryCollectExecutionGovernance(testItem, selectedResult, out var witnessedBy, out var overrideReason))
+        {
+            return;
+        }
+
         var latest = testItem?.ResultHistory.OrderByDescending(result => result.ExecutedAt).FirstOrDefault();
         var result = executionService.RecordResult(new RecordResultRequest
         {
@@ -1719,6 +1729,8 @@ public sealed class ProjectWorkspaceForm : Form
             Comments = comment,
             CapturedInputValues = capturedInputValues,
             SupersedesResultEntryId = latest?.ResultEntryId,
+            WitnessedBy = witnessedBy,
+            OverrideReason = overrideReason,
             ExecutedBy = CurrentActor()
         });
 
@@ -1753,6 +1765,8 @@ public sealed class ProjectWorkspaceForm : Form
             Comments = comment,
             CapturedInputValues = latest.CapturedInputValues,
             SupersedesResultEntryId = latest.ResultEntryId,
+            WitnessedBy = latest.WitnessedBy,
+            OverrideReason = latest.OverrideReason,
             ExecutedBy = CurrentActor()
         });
 
@@ -1783,6 +1797,31 @@ public sealed class ProjectWorkspaceForm : Form
         });
 
         HandleInlineOperationResult(result, "Evidence attached from execution sheet.");
+    }
+
+    private bool TryCollectExecutionGovernance(
+        TestItem testItem,
+        TestResult result,
+        out string? witnessedBy,
+        out string? overrideReason)
+    {
+        witnessedBy = null;
+        overrideReason = null;
+
+        if (!ExecutionGovernanceForm.IsRequiredFor(testItem, result))
+        {
+            return true;
+        }
+
+        using var form = new ExecutionGovernanceForm(testItem, result, CurrentActor());
+        if (form.ShowDialog(this) != DialogResult.OK)
+        {
+            return false;
+        }
+
+        witnessedBy = form.WitnessedBy;
+        overrideReason = form.OverrideReason;
+        return true;
     }
 
     private void HandleInlineOperationResult(OperationResult result, string successMessage)
@@ -3011,6 +3050,11 @@ public sealed class ProjectWorkspaceForm : Form
         }
 
         var supersedes = selected.ResultHistory.LastOrDefault()?.ResultEntryId;
+        if (!TryCollectExecutionGovernance(selected, form.SelectedResult, out var witnessedBy, out var overrideReason))
+        {
+            return;
+        }
+
         var result = executionService.RecordResult(new RecordResultRequest
         {
             ProjectFolderPath = projectFolderPath,
@@ -3019,6 +3063,8 @@ public sealed class ProjectWorkspaceForm : Form
             MeasuredValue = form.MeasuredValue,
             Comments = form.Comments,
             SupersedesResultEntryId = supersedes,
+            WitnessedBy = witnessedBy,
+            OverrideReason = overrideReason,
             ExecutedBy = CurrentActor()
         });
 
