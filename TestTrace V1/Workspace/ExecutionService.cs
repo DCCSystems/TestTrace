@@ -72,7 +72,7 @@ public sealed class ExecutionService
             File.Move(tempPath, finalPath);
 
             var attachedAt = clock();
-            var authority = project.CreateAuthorityStamp(
+            var authority = project.RequireAuthorityStamp(
                 request.AttachedBy.Trim(),
                 AuthorityRole.TestExecutor,
                 AuthorityScopeType.TestItem,

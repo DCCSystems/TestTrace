@@ -144,6 +144,23 @@ internal static class Program
             var workspace = new WorkspaceService(repository);
 
             var usersAuthority = new UsersAuthorityService(repository);
+            var smokeTestUserId = buildResult.Project.Users.Single(user => user.DisplayName == "Smoke Test").UserId;
+            var assignSmokeExecutor = usersAuthority.AssignAuthority(new AssignAuthorityRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                UserId = smokeTestUserId,
+                Role = AuthorityRole.TestExecutor,
+                ScopeType = AuthorityScopeType.Project,
+                ScopeId = buildResult.Project.ProjectId,
+                Reason = "Smoke harness executes test results.",
+                Actor = "Smoke Test"
+            });
+            if (!assignSmokeExecutor.Succeeded || assignSmokeExecutor.TargetId is null)
+            {
+                FailSmoke(assignSmokeExecutor.ErrorMessage, assignSmokeExecutor.Validation.Issues);
+                return;
+            }
+
             var addedUser = usersAuthority.AddUser(new AddUserRequest
             {
                 ProjectFolderPath = buildResult.ProjectFolderPath,
@@ -901,6 +918,50 @@ internal static class Program
                 return;
             }
 
+            var unauthorizedExecution = execution.RecordResult(new RecordResultRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                TestItemId = testResult.TargetId.Value,
+                Result = TestResult.Pass,
+                Comments = "This should be blocked because Andy has no test executor authority.",
+                CapturedInputValues =
+                [
+                    CapturedTestInputValue.Create(l1VoltageInputId, "400"),
+                    CapturedTestInputValue.Create(l2VoltageInputId, "401"),
+                    CapturedTestInputValue.Create(l3VoltageInputId, "399"),
+                    CapturedTestInputValue.Create(rotationDirectionInputId, "true")
+                ],
+                ExecutedBy = "Andy Davis"
+            });
+
+            if (unauthorizedExecution.Succeeded)
+            {
+                FailSmoke("result recording was allowed without active TestExecutor authority.");
+                return;
+            }
+
+            var invalidStructuredInputTypes = execution.RecordResult(new RecordResultRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                TestItemId = testResult.TargetId.Value,
+                Result = TestResult.Pass,
+                Comments = "This should be blocked because captured input types are invalid.",
+                CapturedInputValues =
+                [
+                    CapturedTestInputValue.Create(l1VoltageInputId, "not-a-number"),
+                    CapturedTestInputValue.Create(l2VoltageInputId, "401"),
+                    CapturedTestInputValue.Create(l3VoltageInputId, "399"),
+                    CapturedTestInputValue.Create(rotationDirectionInputId, "maybe")
+                ],
+                ExecutedBy = "Smoke Test"
+            });
+
+            if (invalidStructuredInputTypes.Succeeded)
+            {
+                FailSmoke("structured-input result was allowed with invalid numeric/boolean captured values.");
+                return;
+            }
+
             var resultEntry = execution.RecordResult(new RecordResultRequest
             {
                 ProjectFolderPath = buildResult.ProjectFolderPath,
@@ -1326,6 +1387,18 @@ internal static class Program
                 released.ReleaseRecord.Authority.DisplayName != "Dan Chetwyn")
             {
                 FailSmoke("approval or release authority stamps were not persisted.");
+                return;
+            }
+
+            var postReleaseUserMutation = usersAuthority.AddUser(new AddUserRequest
+            {
+                ProjectFolderPath = buildResult.ProjectFolderPath,
+                DisplayName = "Late User",
+                Actor = "Dan Chetwyn"
+            });
+            if (postReleaseUserMutation.Succeeded)
+            {
+                FailSmoke("released project allowed user or authority model mutation.");
                 return;
             }
 

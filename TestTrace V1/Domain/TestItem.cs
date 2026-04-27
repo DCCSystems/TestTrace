@@ -1,5 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 
+using System.Globalization;
+
 namespace TestTrace_V1.Domain;
 
 public sealed class TestItem
@@ -131,10 +133,13 @@ public sealed class TestItem
         var captured = capturedInputValues ?? [];
         foreach (var value in captured)
         {
-            if (Inputs.All(input => input.TestInputId != value.TestInputId))
+            var input = Inputs.SingleOrDefault(input => input.TestInputId == value.TestInputId);
+            if (input is null)
             {
                 throw new InvalidOperationException("Captured input value does not match a declared test input.");
             }
+
+            ValidateCapturedInputValue(input, value.Value);
         }
 
         foreach (var input in Inputs.Where(input => input.Required))
@@ -146,6 +151,43 @@ public sealed class TestItem
                 throw new InvalidOperationException($"Required input is missing: {input.Label}");
             }
         }
+    }
+
+    private static void ValidateCapturedInputValue(TestInput input, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        switch (input.InputType)
+        {
+            case TestInputType.Numeric:
+                if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out _) &&
+                    !decimal.TryParse(value, NumberStyles.Number, CultureInfo.CurrentCulture, out _))
+                {
+                    throw new InvalidOperationException($"Captured input must be numeric: {input.Label}");
+                }
+                break;
+            case TestInputType.Boolean:
+                if (!IsBooleanValue(value))
+                {
+                    throw new InvalidOperationException($"Captured input must be Yes or No: {input.Label}");
+                }
+                break;
+            case TestInputType.Text:
+                break;
+            default:
+                throw new InvalidOperationException($"Unsupported test input type: {input.InputType}");
+        }
+    }
+
+    private static bool IsBooleanValue(string value)
+    {
+        return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "false", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "yes", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(value, "no", StringComparison.OrdinalIgnoreCase);
     }
 
     public void AttachEvidence(EvidenceRecord evidenceRecord)

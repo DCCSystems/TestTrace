@@ -571,7 +571,7 @@ public sealed class TestTraceProject
             throw new InvalidOperationException("Cannot record a result for a not applicable test.");
         }
 
-        var authority = CreateAuthorityStamp(
+        var authority = RequireAuthorityStamp(
             executedBy,
             AuthorityRole.TestExecutor,
             AuthorityScopeType.TestItem,
@@ -622,7 +622,7 @@ public sealed class TestTraceProject
         var approvalScopeId = approvalRole == AuthorityRole.SectionApprover
             ? sectionId
             : ProjectId;
-        var authority = CreateAuthorityStamp(
+        var authority = RequireAuthorityStamp(
             approvedBy,
             approvalRole,
             approvalScopeType,
@@ -669,7 +669,7 @@ public sealed class TestTraceProject
             throw new InvalidOperationException("Release declaration is required.");
         }
 
-        var authority = CreateAuthorityStamp(
+        var authority = RequireAuthorityStamp(
             releasedBy,
             AuthorityRole.ReleaseAuthority,
             AuthorityScopeType.Project,
@@ -774,6 +774,35 @@ public sealed class TestTraceProject
         return AuthorityStamp.Create(user, role, scopeType, scopeId);
     }
 
+    public AuthorityStamp RequireAuthorityStamp(
+        string actor,
+        AuthorityRole role,
+        AuthorityScopeType scopeType,
+        Guid scopeId,
+        DateTimeOffset at)
+    {
+        var user = EnsureUserAccount(
+            actor,
+            email: null,
+            phone: null,
+            organisation: null,
+            createdBy: actor,
+            createdAt: at);
+
+        if (!user.IsActive)
+        {
+            throw new InvalidOperationException($"{user.DisplayName} is not an active project user.");
+        }
+
+        if (!HasActiveAuthority(user.UserId, role, scopeType, scopeId))
+        {
+            throw new InvalidOperationException(
+                $"{user.DisplayName} does not hold active {role} authority for {ScopeLabel(scopeType, scopeId)}.");
+        }
+
+        return AuthorityStamp.Create(user, role, scopeType, scopeId);
+    }
+
     public UserAccount AddUser(
         string displayName,
         string? email,
@@ -782,6 +811,8 @@ public sealed class TestTraceProject
         string actor,
         DateTimeOffset at)
     {
+        EnsureAuthorityModelEditable();
+
         if (string.IsNullOrWhiteSpace(displayName))
         {
             throw new InvalidOperationException("User display name is required.");
@@ -815,6 +846,8 @@ public sealed class TestTraceProject
         string actor,
         DateTimeOffset at)
     {
+        EnsureAuthorityModelEditable();
+
         var user = FindUser(userId);
         var trimmed = (displayName ?? string.Empty).Trim();
 
@@ -845,6 +878,8 @@ public sealed class TestTraceProject
         string actor,
         DateTimeOffset at)
     {
+        EnsureAuthorityModelEditable();
+
         var user = FindUser(userId);
         if (!user.IsActive)
         {
@@ -876,6 +911,8 @@ public sealed class TestTraceProject
 
     public void ReactivateUser(Guid userId, string actor, DateTimeOffset at)
     {
+        EnsureAuthorityModelEditable();
+
         var user = FindUser(userId);
         if (user.IsActive)
         {
@@ -895,6 +932,8 @@ public sealed class TestTraceProject
         DateTimeOffset at,
         string? reason)
     {
+        EnsureAuthorityModelEditable();
+
         var user = FindUser(userId);
         if (!user.IsActive)
         {
@@ -925,6 +964,8 @@ public sealed class TestTraceProject
         string actor,
         DateTimeOffset at)
     {
+        EnsureAuthorityModelEditable();
+
         var assignment = AuthorityAssignments.SingleOrDefault(candidate => candidate.AssignmentId == assignmentId)
             ?? throw new InvalidOperationException("Authority assignment was not found.");
 
@@ -1017,6 +1058,58 @@ public sealed class TestTraceProject
             assignment.Role == role &&
             assignment.ScopeType == scopeType &&
             assignment.ScopeId == scopeId) == 0;
+    }
+
+    private bool HasActiveAuthority(
+        Guid userId,
+        AuthorityRole role,
+        AuthorityScopeType scopeType,
+        Guid scopeId)
+    {
+        return AuthorityAssignments.Any(assignment =>
+            assignment.IsActive &&
+            assignment.UserId == userId &&
+            AuthorityCovers(assignment, role, scopeType, scopeId));
+    }
+
+    private bool AuthorityCovers(
+        AuthorityAssignment assignment,
+        AuthorityRole role,
+        AuthorityScopeType scopeType,
+        Guid scopeId)
+    {
+        if (assignment.Role == AuthorityRole.Admin &&
+            assignment.ScopeType == AuthorityScopeType.Project &&
+            assignment.ScopeId == ProjectId)
+        {
+            return true;
+        }
+
+        if (assignment.Role != role)
+        {
+            return false;
+        }
+
+        if (assignment.ScopeType == scopeType && assignment.ScopeId == scopeId)
+        {
+            return true;
+        }
+
+        if (assignment.ScopeType == AuthorityScopeType.Project && assignment.ScopeId == ProjectId)
+        {
+            return role switch
+            {
+                AuthorityRole.TestExecutor => scopeType is AuthorityScopeType.TestItem or AuthorityScopeType.Project,
+                AuthorityRole.SectionApprover => scopeType is AuthorityScopeType.Section or AuthorityScopeType.Project,
+                AuthorityRole.ReleaseAuthority => scopeType == AuthorityScopeType.Project,
+                AuthorityRole.FinalApprovalAuthority => scopeType == AuthorityScopeType.Project,
+                AuthorityRole.LeadTestEngineer => scopeType == AuthorityScopeType.Project,
+                AuthorityRole.ContractAuthor => scopeType == AuthorityScopeType.Project,
+                _ => false
+            };
+        }
+
+        return false;
     }
 
     private UserAccount FindUser(Guid userId)
@@ -1257,6 +1350,14 @@ public sealed class TestTraceProject
         if (State is not ProjectState.DraftContractBuilt and not ProjectState.Executable)
         {
             throw new InvalidOperationException("Applicability can only be changed before project release.");
+        }
+    }
+
+    private void EnsureAuthorityModelEditable()
+    {
+        if (State == ProjectState.Released)
+        {
+            throw new InvalidOperationException("Project users and authority assignments cannot be changed after release.");
         }
     }
 
