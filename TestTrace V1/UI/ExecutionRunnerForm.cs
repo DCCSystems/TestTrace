@@ -25,7 +25,7 @@ public sealed class ExecutionRunnerForm : Form
     private readonly ComboBox sectionFilter = new();
     private readonly ComboBox assetFilter = new();
     private readonly ComboBox statusFilter = new();
-    private readonly CheckBox showNotApplicableCheckBox = new() { Text = "Show not applicable", AutoSize = true };
+    private readonly CheckBox showNotApplicableCheckBox = new() { Text = "Show N/A", AutoSize = true };
     private readonly ListView workList = new();
     private readonly FlowLayoutPanel cardsPanel = new();
 
@@ -103,7 +103,7 @@ public sealed class ExecutionRunnerForm : Form
             AutoSize = true,
             AutoSizeMode = AutoSizeMode.GrowAndShrink,
             ColumnCount = 1,
-            RowCount = 3,
+            RowCount = 4,
             Anchor = AnchorStyles.Right | AnchorStyles.Top
         };
 
@@ -240,11 +240,9 @@ public sealed class ExecutionRunnerForm : Form
         var split = new SplitContainer
         {
             Dock = DockStyle.Fill,
-            Orientation = Orientation.Vertical,
-            SplitterDistance = 420,
-            Panel1MinSize = 360,
-            Panel2MinSize = 520
+            Orientation = Orientation.Vertical
         };
+        split.SizeChanged += (_, _) => EnsureWorkSplitDistance(split);
 
         split.Panel1.Controls.Add(CreateQueuePanel());
 
@@ -257,7 +255,30 @@ public sealed class ExecutionRunnerForm : Form
         cardsPanel.Resize += (_, _) => ResizeCards();
 
         split.Panel2.Controls.Add(CreateSurface(cardsPanel, new Padding(0), elevated: false));
+        split.HandleCreated += (_, _) => BeginInvoke(() => EnsureWorkSplitDistance(split));
         return split;
+    }
+
+    private static void EnsureWorkSplitDistance(SplitContainer split)
+    {
+        const int minimumQueueWidth = 360;
+        const int minimumCardsWidth = 520;
+        const int preferredQueueWidth = 420;
+
+        if (split.Width <= minimumQueueWidth + minimumCardsWidth + split.SplitterWidth)
+        {
+            return;
+        }
+
+        split.Panel1MinSize = minimumQueueWidth;
+        split.Panel2MinSize = minimumCardsWidth;
+
+        var max = split.Width - split.SplitterWidth - minimumCardsWidth;
+        var target = Math.Min(preferredQueueWidth, max);
+        if (split.SplitterDistance != target)
+        {
+            split.SplitterDistance = target;
+        }
     }
 
     private Control CreateQueuePanel()
@@ -749,7 +770,7 @@ public sealed class ExecutionRunnerForm : Form
         {
             ColumnCount = 2,
             RowCount = 1,
-            Height = hasInputs ? 330 : 270,
+            Height = hasInputs ? 354 : 330,
             Padding = new Padding(16),
             Margin = new Padding(0, 0, 12, 12),
             BackColor = backColor,
@@ -837,7 +858,7 @@ public sealed class ExecutionRunnerForm : Form
             BackColor = backColor,
             Tag = tag
         };
-        execution.RowStyles.Add(new RowStyle(SizeType.Absolute, 72));
+        execution.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
         execution.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
         execution.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
         execution.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
@@ -908,6 +929,7 @@ public sealed class ExecutionRunnerForm : Form
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 22));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
 
         panel.Controls.Add(CreateCardLabel(
             ExecutionStateText(item),
@@ -929,6 +951,17 @@ public sealed class ExecutionRunnerForm : Form
             foreColor,
             SystemFonts.DefaultFont,
             tag), 0, 2);
+
+        panel.Controls.Add(CreateCardLabel(
+            item.EffectiveApplicability == ApplicabilityState.NotApplicable
+                ? "Governance: out of scope"
+                : ExecutionGovernanceVisibility.For(project, item.TestItem).Text,
+            backColor,
+            item.TestItem.LatestFailureBlocksProgression()
+                ? AppTheme.Current.FailForeground
+                : foreColor,
+            SystemFonts.DefaultFont,
+            tag), 0, 3);
 
         return panel;
     }
@@ -1035,9 +1068,9 @@ public sealed class ExecutionRunnerForm : Form
 
         panel.Controls.Add(new Label
         {
-            Text = testItem.EvidenceRecords.Count == 0 ? "Evidence: 0" : $"Evidence: {testItem.EvidenceRecords.Count} attached",
+            Text = $"Evidence: {testItem.EvidenceRecords.Count}",
             AutoSize = false,
-            Width = 160,
+            Width = 130,
             Height = 34,
             TextAlign = ContentAlignment.MiddleLeft,
             Font = new Font(SystemFonts.DefaultFont, testItem.EvidenceRecords.Count > 0 ? FontStyle.Bold : FontStyle.Regular),
@@ -1049,7 +1082,9 @@ public sealed class ExecutionRunnerForm : Form
         var add = new Button
         {
             Text = "Add Evidence",
-            AutoSize = true,
+            AutoSize = false,
+            Width = 132,
+            Height = 34,
             Visible = !notApplicable,
             Cursor = canExecute ? Cursors.Hand : Cursors.No,
             Tag = tag

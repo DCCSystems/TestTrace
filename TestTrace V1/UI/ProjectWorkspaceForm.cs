@@ -645,9 +645,9 @@ public sealed class ProjectWorkspaceForm : Form
             return;
         }
 
-        const int desiredContextPanelWidth = 410;
-        const int minimumCenterPanelWidth = 620;
-        const int minimumContextPanelWidth = 320;
+        const int desiredContextPanelWidth = 340;
+        const int minimumCenterPanelWidth = 760;
+        const int minimumContextPanelWidth = 300;
 
         var min = minimumCenterPanelWidth;
         var max = contentSplit.Width - minimumContextPanelWidth;
@@ -995,7 +995,7 @@ public sealed class ProjectWorkspaceForm : Form
         {
             ColumnCount = 2,
             RowCount = 1,
-            Height = hasInputs ? 360 : 300,
+            Height = hasInputs ? 420 : 360,
             Margin = new Padding(0, 0, 12, 10),
             Padding = new Padding(12),
             BackColor = backColor,
@@ -1089,10 +1089,10 @@ public sealed class ProjectWorkspaceForm : Form
             BackColor = backColor,
             Tag = tag
         };
-        executionPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 76));
+        executionPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
         executionPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 58));
         executionPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 24));
-        executionPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 70));
+        executionPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 94));
         executionPanel.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
         executionPanel.Click += (_, _) => SelectExecutionStrip(tag);
         executionPanel.Controls.Add(CreateExecutionStatePanel(testItem, latest, notApplicable, applicabilityReason, backColor, foreColor, tag), 0, 0);
@@ -1412,10 +1412,11 @@ public sealed class ProjectWorkspaceForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 4,
+            RowCount = 5,
             BackColor = backColor,
             Tag = tag
         };
+        panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         panel.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -1465,6 +1466,23 @@ public sealed class ProjectWorkspaceForm : Form
         timestamp.Click += (_, _) => SelectExecutionStrip(tag);
         panel.Controls.Add(timestamp, 0, 2);
 
+        var governance = new Label
+        {
+            Text = notApplicable
+                ? "Governance: out of scope"
+                : ExecutionGovernanceVisibility.For(project, testItem).Text,
+            AutoSize = false,
+            Dock = DockStyle.Fill,
+            Height = 20,
+            ForeColor = testItem.LatestFailureBlocksProgression()
+                ? AppTheme.Current.FailForeground
+                : foreColor,
+            BackColor = backColor,
+            Tag = tag
+        };
+        governance.Click += (_, _) => SelectExecutionStrip(tag);
+        panel.Controls.Add(governance, 0, 3);
+
         var measured = new Label
         {
             Text = latest is null || string.IsNullOrWhiteSpace(latest.MeasuredValue) ? string.Empty : $"Measured: {latest.MeasuredValue}",
@@ -1475,7 +1493,7 @@ public sealed class ProjectWorkspaceForm : Form
             Tag = tag
         };
         measured.Click += (_, _) => SelectExecutionStrip(tag);
-        panel.Controls.Add(measured, 0, 3);
+        panel.Controls.Add(measured, 0, 4);
         return panel;
     }
 

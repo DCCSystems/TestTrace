@@ -16,8 +16,7 @@ public sealed class ExecutionGovernanceForm : Form
 
     public static bool IsRequiredFor(TestItem testItem, TestResult result)
     {
-        return testItem.BehaviourRules.RequiresWitness ||
-            (result == TestResult.Fail && testItem.BehaviourRules.AllowOverrideWithReason);
+        return ExecutionGovernancePrompt.For(testItem, result).IsRequired;
     }
 
     public ExecutionGovernanceForm(
@@ -84,13 +83,14 @@ public sealed class ExecutionGovernanceForm : Form
         fields.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         var row = 0;
-        if (testItem.BehaviourRules.RequiresWitness)
+        var prompt = ExecutionGovernancePrompt.For(testItem, result);
+        if (prompt.RequiresWitness)
         {
             fields.RowStyles.Add(new RowStyle(SizeType.AutoSize));
             AddField(fields, row++, "Witnessed by *", witnessTextBox, initialWitness);
         }
 
-        if (result == TestResult.Fail && testItem.BehaviourRules.AllowOverrideWithReason)
+        if (prompt.OffersOverrideReason)
         {
             fields.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             AddMultilineField(
@@ -185,7 +185,7 @@ public sealed class ExecutionGovernanceForm : Form
         validationTextBox.Clear();
         var issues = new List<string>();
 
-        if (testItem.BehaviourRules.RequiresWitness)
+        if (ExecutionGovernancePrompt.For(testItem, result).RequiresWitness)
         {
             if (string.IsNullOrWhiteSpace(witnessTextBox.Text))
             {

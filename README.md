@@ -28,6 +28,12 @@ Smoke:
 dotnet "C:\Users\Dan\AppData\Local\Temp\TestTraceVerify\TestTrace V1.dll" --smoke
 ```
 
+Governance regression harness:
+
+```powershell
+dotnet run --project "C:\Users\Dan\DCC Systems\projects\testtrace-governance\architecture\TestTrace\TestTrace V1.GovernanceTests\TestTrace V1.GovernanceTests.csproj"
+```
+
 Run app:
 
 ```powershell
