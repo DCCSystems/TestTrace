@@ -1,0 +1,30 @@
+name: Desktop CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["desktop-reference-*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify-desktop:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Build desktop app
+        run: dotnet build "TestTrace V1\TestTrace V1.csproj" -o "$env:RUNNER_TEMP\TestTraceVerify"
+
+      - name: Run governance harness
+        run: dotnet run --project "TestTrace V1.GovernanceTests\TestTrace V1.GovernanceTests.csproj"
+
+      - name: Run smoke check
+        run: dotnet "$env:RUNNER_TEMP\TestTraceVerify\TestTrace V1.dll" --smoke
